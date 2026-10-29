@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:fragment="layout(title, content)">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:replace="${title}">jsmd</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="app">
+<header class="banner">
+    <span class="app-name">jsmd</span>
+    <div class="user">
+        <span class="username" th:text="${username}">admin</span>
+        <form th:action="@{/logout}" method="post">
+            <button type="submit" class="logout">Log out</button>
+        </form>
+    </div>
+</header>
+<nav class="menu" aria-label="Main menu" th:fragment="menu">
+    <ul>
+        <li><a th:href="@{/}" th:classappend="${active == 'home'} ? 'active'"
+               th:attr="aria-current=${active == 'home'} ? 'page'">Home</a></li>
+        <li><a th:href="@{/documents}" th:classappend="${active == 'documents'} ? 'active'"
+               th:attr="aria-current=${active == 'documents'} ? 'page'">Documents</a></li>
+        <li><a th:href="@{/queue}" th:classappend="${active == 'queue'} ? 'active'"
+               th:attr="aria-current=${active == 'queue'} ? 'page'">Queue</a></li>
+    </ul>
+</nav>
+<main class="content" th:replace="${content}">
+    <p>Page content</p>
+</main>
+</body>
+</html>

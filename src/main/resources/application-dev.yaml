@@ -1,0 +1,19 @@
+# Development profile, activated by `mvn spring-boot:run`. Never implied by `java -jar`.
+spring:
+  docker:
+    compose:
+      enabled: true
+      lifecycle-management: start-only
+      file: docker-compose.yml
+
+jsmd:
+  admin:
+    # Known development account; explicit JSMD_ADMIN_* values override it.
+    username: ${JSMD_ADMIN_USERNAME:admin}
+    password: ${JSMD_ADMIN_PASSWORD:admin}
+  scan:
+    # Drop documents into ./dev-documents; env overrides win.
+    directories: ${JSMD_SCAN_DIRECTORIES:./dev-documents}
+    interval: ${JSMD_SCAN_INTERVAL:PT1M}
+  extract:
+    poll-interval: ${JSMD_EXTRACT_POLL_INTERVAL:PT1M}

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::title}, ~{::main})}">
+<head>
+    <title>Documents - jsmd</title>
+</head>
+<body>
+<main class="content">
+    <h1>Documents</h1>
+    <form class="search" method="get" th:action="@{/documents}" role="search">
+        <input type="search" name="q" th:value="${query}" maxlength="200"
+               aria-label="Search document text" placeholder="Search document text">
+        <button type="submit">Search</button>
+    </form>
+
+    <th:block th:if="${searching}">
+        <p class="result-count" th:if="${total == 0}">
+            No documents match <strong th:text="${query}">query</strong>.
+            <a th:href="@{/documents}">Show all documents</a>
+        </p>
+        <p class="result-count" th:unless="${total == 0}"
+           th:text="${total} + (${total == 1} ? ' file matches' : ' files match')">3 files match</p>
+        <table class="documents results" th:unless="${results.isEmpty()}">
+            <thead>
+            <tr>
+                <th>File name</th>
+                <th>Path</th>
+                <th class="num">Size</th>
+                <th>Match</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${results}">
+                <td>
+                    <a th:href="@{/documents/{id}(id=${r.id})}" th:text="${r.fileName}">file.pdf</a>
+                <a class="download" th:href="@{/documents/{id}/download(id=${r.id})}"
+                   th:attr="aria-label='Download ' + ${r.fileName}, title='Download ' + ${r.fileName}">
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                        <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" fill="none" stroke="currentColor"
+                              stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </a>
+                </td>
+                <td class="path" th:text="${r.path}">/data/file.pdf</td>
+                <td class="num" th:text="${#numbers.formatInteger(r.size, 1, 'DEFAULT')} + ' B'">1 B</td>
+                <td class="snippet"><th:block th:each="seg : ${r.snippet.segments}"><mark th:if="${seg.highlighted}" th:text="${seg.text}">match</mark><th:block th:unless="${seg.highlighted}" th:text="${seg.text}">text</th:block></th:block></td>
+            </tr>
+            </tbody>
+        </table>
+    </th:block>
+
+    <th:block th:unless="${searching}">
+        <p th:if="${documents.isEmpty()}">No documents have been indexed yet.</p>
+        <table class="documents" th:unless="${documents.isEmpty()}">
+            <thead>
+            <tr>
+                <th>File name</th>
+                <th>Path</th>
+                <th class="num">Size</th>
+                <th>Text</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="d : ${documents}">
+                <td>
+                    <a th:href="@{/documents/{id}(id=${d.id})}" th:text="${d.fileName}">file.pdf</a>
+                <a class="download" th:href="@{/documents/{id}/download(id=${d.id})}"
+                   th:attr="aria-label='Download ' + ${d.fileName}, title='Download ' + ${d.fileName}">
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                        <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" fill="none" stroke="currentColor"
+                              stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </a>
+                </td>
+                <td class="path" th:text="${d.path}">/data/file.pdf</td>
+                <td class="num" th:text="${#numbers.formatInteger(d.size, 1, 'DEFAULT')} + ' B'">1 B</td>
+                <td th:text="${d.state.label}">Pending</td>
+            </tr>
+            </tbody>
+        </table>
+    </th:block>
+
+    <nav class="pager" aria-label="Pages" th:unless="${searching ? results.isEmpty() : documents.isEmpty()}">
+        <a th:if="${hasPrevious and !searching}" th:href="@{/documents(page=${page - 1})}" rel="prev">Previous</a>
+        <a th:if="${hasPrevious and searching}" th:href="@{/documents(page=${page - 1},q=${query})}" rel="prev">Previous</a>
+        <span th:text="'Page ' + ${page + 1} + ' &middot; ' + ${total} + ' files'">Page 1</span>
+        <a th:if="${hasNext and !searching}" th:href="@{/documents(page=${page + 1})}" rel="next">Next</a>
+        <a th:if="${hasNext and searching}" th:href="@{/documents(page=${page + 1},q=${query})}" rel="next">Next</a>
+    </nav>
+</main>
+</body>
+</html>

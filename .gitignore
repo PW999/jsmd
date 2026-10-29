@@ -1,0 +1,14 @@
+target/
+.env
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+jdk-*/
+# Local development documents (scanned under the dev profile)
+dev-documents/

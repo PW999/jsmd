@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::title}, ~{::main})}">
+<head>
+    <title>Document unavailable - jsmd</title>
+</head>
+<body>
+<main class="content">
+    <h1 th:text="${heading}">File not available</h1>
+    <p th:text="${message}">The file is no longer available on disk.</p>
+    <p><a th:href="@{/documents}">Back to documents</a></p>
+</main>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::title}, ~{::main})}">
+<head>
+    <title th:text="${document.fileName} + ' - jsmd'">Document - jsmd</title>
+</head>
+<body>
+<main class="content">
+    <p><a th:href="@{/documents}">&larr; Back to documents</a></p>
+    <h1>
+        <span th:text="${document.fileName}">file.pdf</span>
+        <a class="download" th:href="@{/documents/{id}/download(id=${document.id})}"
+           th:attr="aria-label='Download ' + ${document.fileName}, title='Download ' + ${document.fileName}">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" fill="none" stroke="currentColor"
+                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </a>
+    </h1>
+    <dl class="meta">
+        <dt>Path</dt>
+        <dd th:text="${document.path}">/data/file.pdf</dd>
+        <dt>Size</dt>
+        <dd th:text="${#numbers.formatInteger(document.size, 1, 'DEFAULT')} + ' B'">1 B</dd>
+        <dt>Text</dt>
+        <dd th:text="${document.state.label}">Pending</dd>
+        <dt th:if="${document.pageCount != null}">Pages</dt>
+        <dd th:if="${document.pageCount != null}" th:text="${document.pageCount}">1</dd>
+    </dl>
+    <h2>Extracted text</h2>
+    <pre class="extracted-text" th:if="${document.hasText}" th:text="${document.text}">text</pre>
+    <p th:unless="${document.hasText}">No text available.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::title}, ~{::main})}">
+<head>
+    <title>Queue - jsmd</title>
+</head>
+<body>
+<main class="content" th:attr="data-refresh-seconds=${refreshSeconds}">
+    <h1>Queue</h1>
+
+    <p class="flash" role="status" th:if="${message}" th:text="${message}">Purged 2 finished item(s).</p>
+    <p class="flash error" role="alert" th:if="${error}" th:text="${error}">Item could not be removed.</p>
+
+    <div id="queue-live">
+    <table class="queue-counts">
+        <thead>
+        <tr>
+            <th>Queue</th>
+            <th class="num">Pending</th>
+            <th class="num">Claimed</th>
+            <th class="num">Failed</th>
+            <th class="num">Done</th>
+            <th class="num">Cancelled</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="c : ${counts}">
+            <th scope="row" th:text="${c.queue}">PROCESS</th>
+            <td class="num" th:text="${c.pending}">0</td>
+            <td class="num" th:text="${c.claimed}">0</td>
+            <td class="num" th:text="${c.failed}" th:classappend="${c.failed > 0} ? 'failed'">0</td>
+            <td class="num" th:text="${c.done}">0</td>
+            <td class="num" th:text="${c.cancelled}">0</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <form class="purge" method="post" th:action="@{/queue/purge}"
+          onsubmit="return confirm('Remove all finished items (failed, done, cancelled) from all queues?');">
+        <button type="submit" class="danger">Purge finished items</button>
+    </form>
+
+    <p th:if="${total == 0}">The queues are empty.</p>
+
+    <th:block th:unless="${total == 0}">
+
+        <p class="truncated" th:if="${truncated}"
+           th:text="'Showing the first ' + ${limit} + ' of ' + ${total} + ' items.'">Showing the first 200 of 500 items.</p>
+
+        <table class="documents queue-items">
+            <thead>
+            <tr>
+                <th>Queue</th>
+                <th>Status</th>
+                <th class="num">Attempts</th>
+                <th>Last error</th>
+                <th>Created</th>
+                <th>Path</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="i : ${items}">
+                <td th:text="${i.queue}">PROCESS</td>
+                <td><span class="status" th:classappend="${'status-' + #strings.toLowerCase(i.status)}"
+                          th:text="${i.status}">PENDING</span></td>
+                <td class="num" th:text="${i.attempts}">0</td>
+                <td class="error-text" th:text="${i.lastError}">error</td>
+                <td class="nowrap" th:text="${#strings.replace(i.createdAt.toString(), 'T', ' ')}">2026-01-01 00:00:00Z</td>
+                <td class="path" th:text="${i.path}">/data/file.pdf</td>
+                <td>
+                    <form method="post" th:action="@{/queue/items/{id}/remove(id=${i.id})}" th:if="${i.failed}">
+                        <button type="submit" class="remove">Remove</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </th:block>
+    </div>
+
+    <script>
+        // Refreshes only the live region: no page reload, so scroll position and the flash message are kept.
+        (function () {
+            var main = document.querySelector('main[data-refresh-seconds]');
+            var delay = Number(main.dataset.refreshSeconds) * 1000;
+            function schedule() { setTimeout(refresh, delay); }
+            function refresh() {
+                if (document.hidden) { return schedule(); }
+                fetch(location.pathname, {credentials: 'same-origin', headers: {'Accept': 'text/html'}})
+                    .then(function (response) {
+                        if (response.redirected) { location.reload(); return null; }
+                        return response.ok ? response.text() : null;
+                    })
+                    .then(function (html) {
+                        if (html === null) { return; }
+                        var fresh = new DOMParser().parseFromString(html, 'text/html').getElementById('queue-live');
+                        if (fresh) { document.getElementById('queue-live').innerHTML = fresh.innerHTML; }
+                    })
+                    .catch(function () { /* server unreachable: try again next round */ })
+                    .then(schedule);
+            }
+            schedule();
+        })();
+    </script>
+</main>
+</body>
+</html>
