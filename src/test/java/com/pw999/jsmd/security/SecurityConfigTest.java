@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.pw999.jsmd.document.DocumentDownloadService;
 import com.pw999.jsmd.document.DocumentRepository;
+import com.pw999.jsmd.embed.EmbeddingService;
 import com.pw999.jsmd.queue.QueueMonitor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,9 @@ class SecurityConfigTest {
 
     @MockitoBean
     DocumentDownloadService downloads;
+
+    @MockitoBean
+    EmbeddingService embeddings;
 
     @MockitoBean
     QueueMonitor queueMonitor;

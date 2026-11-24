@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import com.pw999.jsmd.embed.EmbeddingService;
 import com.pw999.jsmd.queue.QueueName;
 import com.pw999.jsmd.queue.WorkItem;
 import com.pw999.jsmd.queue.WorkQueue;
@@ -25,17 +26,20 @@ public class ExtractionService {
 
     private final WorkQueue workQueue;
     private final ContentTextRepository repository;
+    private final EmbeddingService embeddingService;
     private final PdfExtractor pdfExtractor;
     private final ImageExtractor imageExtractor;
     private final FileHasher fileHasher;
 
     public ExtractionService(WorkQueue workQueue,
                              ContentTextRepository repository,
+                             EmbeddingService embeddingService,
                              PdfExtractor pdfExtractor,
                              ImageExtractor imageExtractor,
                              FileHasher fileHasher) {
         this.workQueue = workQueue;
         this.repository = repository;
+        this.embeddingService = embeddingService;
         this.pdfExtractor = pdfExtractor;
         this.imageExtractor = imageExtractor;
         this.fileHasher = fileHasher;
@@ -64,7 +68,8 @@ public class ExtractionService {
             };
 
             if (result != null) {
-                repository.upsert(item.contentId(), result.text(), result.source(), null);
+                float[] embedding = embeddingService.embed(result.text());
+                repository.upsert(item.contentId(), result.text(), result.source(), null, embedding);
             }
 
             boolean completed = workQueue.complete(item.id());

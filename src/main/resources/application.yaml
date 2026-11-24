@@ -48,3 +48,9 @@ jsmd:
     tessdata-path: ${JSMD_EXTRACT_TESSDATA_PATH:}
     tesseract-library: ${JSMD_EXTRACT_TESSERACT_LIBRARY:libtesseract.so.5.5}
     render-dpi: ${JSMD_EXTRACT_RENDER_DPI:300}
+  embed:
+    enabled: ${JSMD_EMBED_ENABLED:true}
+    base-uri: ${JSMD_EMBED_BASE_URI:http://localhost:11434}
+    model: ${JSMD_EMBED_MODEL:nomic-embed-text:v1.5}
+    dimension: ${JSMD_EMBED_DIMENSION:768}
+    timeout: ${JSMD_EMBED_TIMEOUT:PT60S}

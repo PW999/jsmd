@@ -40,7 +40,7 @@ class DirectoryScannerIT {
     private static final Instant BASE = Instant.parse("2026-01-01T00:00:00Z");
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("pgvector/pgvector:pg17");
 
     @TempDir
     Path tmp;

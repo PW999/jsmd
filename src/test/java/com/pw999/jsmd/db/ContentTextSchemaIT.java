@@ -19,7 +19,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 class ContentTextSchemaIT {
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("pgvector/pgvector:pg17");
 
     private static final AtomicInteger SHA_COUNTER = new AtomicInteger(1);
 

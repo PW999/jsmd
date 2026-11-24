@@ -28,7 +28,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 class QueueMonitorIT {
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("pgvector/pgvector:pg17");
 
     DriverManagerDataSource dataSource;
     JdbcClient jdbc;

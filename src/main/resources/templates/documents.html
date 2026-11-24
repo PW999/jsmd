@@ -10,6 +10,10 @@
     <form class="search" method="get" th:action="@{/documents}" role="search">
         <input type="search" name="q" th:value="${query}" maxlength="200"
                aria-label="Search document text" placeholder="Search document text">
+        <fieldset class="search-mode" aria-label="Search mode">
+            <label><input type="radio" name="mode" value="fts" th:checked="${mode != 'vector'}"> Full text</label>
+            <label><input type="radio" name="mode" value="vector" th:checked="${mode == 'vector'}"> Vector</label>
+        </fieldset>
         <button type="submit">Search</button>
     </form>
 
@@ -26,7 +30,7 @@
                 <th>File name</th>
                 <th>Path</th>
                 <th class="num">Size</th>
-                <th>Match</th>
+                <th th:if="${mode != 'vector'}">Match</th>
             </tr>
             </thead>
             <tbody>
@@ -43,7 +47,7 @@
                 </td>
                 <td class="path" th:text="${r.path}">/data/file.pdf</td>
                 <td class="num" th:text="${#numbers.formatInteger(r.size, 1, 'DEFAULT')} + ' B'">1 B</td>
-                <td class="snippet"><th:block th:each="seg : ${r.snippet.segments}"><mark th:if="${seg.highlighted}" th:text="${seg.text}">match</mark><th:block th:unless="${seg.highlighted}" th:text="${seg.text}">text</th:block></th:block></td>
+                <td class="snippet" th:if="${mode != 'vector'}"><th:block th:each="seg : ${r.snippet.segments}"><mark th:if="${seg.highlighted}" th:text="${seg.text}">match</mark><th:block th:unless="${seg.highlighted}" th:text="${seg.text}">text</th:block></th:block></td>
             </tr>
             </tbody>
         </table>
@@ -82,10 +86,10 @@
 
     <nav class="pager" aria-label="Pages" th:unless="${searching ? results.isEmpty() : documents.isEmpty()}">
         <a th:if="${hasPrevious and !searching}" th:href="@{/documents(page=${page - 1})}" rel="prev">Previous</a>
-        <a th:if="${hasPrevious and searching}" th:href="@{/documents(page=${page - 1},q=${query})}" rel="prev">Previous</a>
+        <a th:if="${hasPrevious and searching}" th:href="@{/documents(page=${page - 1},q=${query},mode=${mode})}" rel="prev">Previous</a>
         <span th:text="'Page ' + ${page + 1} + ' &middot; ' + ${total} + ' files'">Page 1</span>
         <a th:if="${hasNext and !searching}" th:href="@{/documents(page=${page + 1})}" rel="next">Next</a>
-        <a th:if="${hasNext and searching}" th:href="@{/documents(page=${page + 1},q=${query})}" rel="next">Next</a>
+        <a th:if="${hasNext and searching}" th:href="@{/documents(page=${page + 1},q=${query},mode=${mode})}" rel="next">Next</a>
     </nav>
 </main>
 </body>

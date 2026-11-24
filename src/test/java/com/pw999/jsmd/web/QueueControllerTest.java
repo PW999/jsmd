@@ -18,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.pw999.jsmd.document.DocumentDownloadService;
 import com.pw999.jsmd.document.DocumentRepository;
+import com.pw999.jsmd.embed.EmbeddingService;
 import com.pw999.jsmd.queue.QueueMonitor;
 import com.pw999.jsmd.queue.QueueMonitor.QueueCounts;
 import com.pw999.jsmd.queue.QueueMonitor.QueueItemRow;
@@ -52,6 +53,9 @@ class QueueControllerTest {
 
     @MockitoBean
     DocumentDownloadService downloads;
+
+    @MockitoBean
+    EmbeddingService embeddings;
 
     private static List<QueueCounts> counts(long processFailed) {
         return List.of(new QueueCounts(QueueName.PROCESS, 2, 1, processFailed, 3, 0),
