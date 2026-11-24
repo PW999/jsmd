@@ -28,6 +28,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import com.pw999.jsmd.embed.EmbeddingService;
+import com.pw999.jsmd.embed.EmbedProperties;
 import com.pw999.jsmd.queue.QueueName;
 import com.pw999.jsmd.queue.QueueProperties;
 import com.pw999.jsmd.queue.WorkQueue;
@@ -42,7 +44,7 @@ import com.pw999.jsmd.scan.FileHasher;
 class ExtractionServiceIT {
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("pgvector/pgvector:pg17");
 
     private static final String LIBRARY = System.getProperty("jsmd.tesseract.library", "libtesseract.so.5.5");
     private static boolean tesseractAvailable;
@@ -83,7 +85,15 @@ class ExtractionServiceIT {
         PdfExtractor pdfExtractor = new PdfExtractor(textReader, ocrService);
         ImageExtractor imageExtractor = new ImageExtractor(ocrService);
 
-        service = new ExtractionService(workQueue, repo, pdfExtractor, imageExtractor, new FileHasher());
+        EmbeddingService embeddingService = new EmbeddingService(
+                new EmbedProperties(false, "http://localhost:11434", "nomic-embed-text:v1.5", 768, Duration.ofMinutes(60)),
+                new org.springframework.beans.factory.ObjectProvider<dev.langchain4j.model.embedding.EmbeddingModel>() {
+                    @Override
+                    public dev.langchain4j.model.embedding.EmbeddingModel getObject() {
+                        throw new IllegalStateException("no embedding model in test");
+                    }
+                });
+        service = new ExtractionService(workQueue, repo, embeddingService, pdfExtractor, imageExtractor, new FileHasher());
     }
 
     private static boolean isTesseractAvailable() {

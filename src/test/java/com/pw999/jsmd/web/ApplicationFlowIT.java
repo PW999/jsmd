@@ -32,7 +32,7 @@ class ApplicationFlowIT {
     private static final Pattern CSRF = Pattern.compile("name=\"_csrf\" type=\"hidden\" value=\"([^\"]+)\"|name=\"_csrf\"[^>]*value=\"([^\"]+)\"");
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("pgvector/pgvector:pg17");
 
     static ConfigurableApplicationContext context;
     static String base;

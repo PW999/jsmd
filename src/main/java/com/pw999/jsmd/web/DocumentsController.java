@@ -5,7 +5,12 @@ import com.pw999.jsmd.document.DocumentDownload;
 import com.pw999.jsmd.document.DocumentDownloadService;
 import com.pw999.jsmd.document.DocumentNotFoundException;
 import com.pw999.jsmd.document.DocumentRepository;
+import com.pw999.jsmd.document.SearchResult;
+import com.pw999.jsmd.embed.EmbeddingService;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -25,29 +30,52 @@ class DocumentsController {
 
     static final int PAGE_SIZE = 50;
     static final int MAX_QUERY_LENGTH = 200;
+    static final String MODE_FULL_TEXT = "fts";
+    static final String MODE_VECTOR = "vector";
+
+    private static final Logger log = LoggerFactory.getLogger(DocumentsController.class);
 
     private final DocumentRepository documents;
     private final DocumentDownloadService downloads;
+    private final EmbeddingService embeddings;
 
-    DocumentsController(DocumentRepository documents, DocumentDownloadService downloads) {
+    DocumentsController(DocumentRepository documents, DocumentDownloadService downloads, EmbeddingService embeddings) {
         this.documents = documents;
         this.downloads = downloads;
+        this.embeddings = embeddings;
     }
 
     @GetMapping("/documents")
     String list(@RequestParam(defaultValue = "0") int page,
                 @RequestParam(name = "q", required = false) String q,
+                @RequestParam(name = "mode", required = false) String mode,
                 Model model) {
         String query = normalise(q);
         boolean searching = !query.isEmpty();
-        long total = searching ? documents.countMatches(query) : documents.count();
+        boolean vector = searching && MODE_VECTOR.equalsIgnoreCase(mode);
+        float[] queryVector = vector ? embedOrNull(query) : null;
+        boolean vectorUnavailable = vector && queryVector == null;
+
+        long total;
+        if (vector && !vectorUnavailable) {
+            total = documents.countVectorMatches();
+        } else if (searching) {
+            total = documents.countMatches(query);
+        } else {
+            total = documents.count();
+        }
         int lastPage = (int) Math.max(0, (total - 1) / PAGE_SIZE);
         int current = Math.min(Math.max(page, 0), lastPage);
 
         model.addAttribute("active", "documents");
         model.addAttribute("searching", searching);
         model.addAttribute("query", query);
-        if (searching) {
+        model.addAttribute("mode", vector ? MODE_VECTOR : MODE_FULL_TEXT);
+        if (vector && vectorUnavailable) {
+            model.addAttribute("results", List.of());
+        } else if (vector) {
+            model.addAttribute("results", documents.searchVector(queryVector, current, PAGE_SIZE));
+        } else if (searching) {
             model.addAttribute("results", documents.search(query, current, PAGE_SIZE));
         } else {
             model.addAttribute("documents", documents.list(current, PAGE_SIZE));
@@ -57,6 +85,19 @@ class DocumentsController {
         model.addAttribute("hasPrevious", current > 0);
         model.addAttribute("hasNext", current < lastPage);
         return "documents";
+    }
+
+    /**
+     * Embeds a query for vector search, or returns null when the embedding service is unavailable or disabled;
+     * the caller then shows no results instead of failing.
+     */
+    private float[] embedOrNull(String query) {
+        try {
+            return embeddings.embed(query);
+        } catch (RuntimeException e) {
+            log.warn("Vector search unavailable: {}", e.getMessage());
+            return null;
+        }
     }
 
     private static String normalise(String q) {

@@ -13,7 +13,8 @@ This foundation provides the build, database connectivity (Flyway-managed schema
   ```
 
 - **Maven** 3.9+
-- **Docker** (with the Compose plugin), running. It provides the local PostgreSQL and is used by the integration tests (Testcontainers).
+- **Docker** (with the Compose plugin), running. It provides the local PostgreSQL and is used by the integration tests (Testcontainers). The PostgreSQL image is `pgvector/pgvector:pg17`, which includes the `vector` extension used for semantic search.
+- **[PERSON_NAME]** with the `nomic-embed-text:v1.5` model pulled (`ollama pull nomic-embed-text:v1.5`), running on `http://localhost:11434` by default. Embedding is used to prepare documents for vectorized search and can be switched off with `JSMD_EMBED_ENABLED=false`.
 
 ## Configuration
 
@@ -42,6 +43,11 @@ Settings live in `src/main/resources/application.yaml` and are overridden by env
 | `JSMD_EXTRACT_TESSDATA_PATH`   | no   | system default (`TESSDATA_PREFIX`)       | Absolute path to the directory containing `.traineddata` files |
 | `JSMD_EXTRACT_TESSERACT_LIBRARY` | no | `libtesseract.so.5.5`                  | Native Tesseract library name or absolute path |
 | `JSMD_EXTRACT_RENDER_DPI`      | no   | `300`                                    | DPI used when rendering PDF pages for OCR (minimum 72; higher is slower but more accurate) |
+| `JSMD_EMBED_ENABLED`           | no   | `true`                                   | Set to `false` to stop generating embeddings (text is stored without vectors) |
+| `JSMD_EMBED_BASE_URI`          | no   | `http://localhost:11434`                 | Ollama server base URI |
+| `JSMD_EMBED_MODEL`             | no   | `nomic-embed-text:v1.5`                  | Name of the Ollama embedding model |
+| `JSMD_EMBED_DIMENSION`         | no   | `768`                                    | Embedding vector dimension (must match the database column) |
+| `JSMD_EMBED_TIMEOUT`           | no   | `PT60S`                                  | Per-request timeout for embedding calls |
 
 There are no default admin credentials outside the `dev` profile (see [Run locally](#run-locally)): startup fails with an error naming the missing setting (`jsmd.admin.username` or `jsmd.admin.password`) if either is missing or blank and `dev` is not active. The password is BCrypt-hashed in memory and never logged.
 
@@ -160,6 +166,14 @@ Query syntax (PostgreSQL `websearch_to_tsquery`; no input can cause a syntax err
 `or` and `-` apply to the term next to them, so `cat or dog -fish` means `cat`, or `dog` without `fish`.
 
 Matching uses the PostgreSQL `simple` text search configuration: words are compared case-insensitively but without stemming, so `invoices` does not match `invoice` (use `invoice or invoices`). This keeps English and Dutch text, which OCR can produce side by side, searchable alike. Only the first 500,000 characters of a document's text are indexed, because PostgreSQL cannot build a larger search vector; words beyond that are not found, although the detail page shows the full text. The search index is maintained by the database itself, so newly extracted or re-extracted text is searchable immediately and no separate indexing step exists.
+
+### Vectorized search
+
+In addition to full-text search, the Documents page offers a **Vector** search mode backed by pgvector cosine similarity (`embedding <=> ?::vector`). When the mode is selected, the query text is embedded through [PERSON_NAME] and compared against stored embeddings, ordered by similarity, best match first (ties by path). Results show the file name (linking to the detail page), download icon, path and size; no text snippet is rendered in vector mode because term-based highlighting does not apply. Paging keeps the query and mode, and the page states the number of matching files.
+
+- Files whose text has not been embedded (or for which the embedding service is disabled/unavailable) are never returned in vector mode.
+- The mode is opt-in; when the embedding service is unavailable the vector mode responds normally with no results and no error.
+- The `content_text` table gains a nullable `embedding vector(768)` column (Flyway migration `V5__content_text_embedding.sql`) plus an ivfflat index. When text is stored, the embedding is generated through the configured embedding model and stored together with the text; embedding failures mark the work queue item failed (retried per queue rules) and text is not stored without a vector.
 
 ## Queue page
 

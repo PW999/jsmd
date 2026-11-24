@@ -21,6 +21,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import com.pw999.jsmd.embed.EmbeddingService;
+import com.pw999.jsmd.embed.EmbedProperties;
 import com.pw999.jsmd.queue.QueueName;
 import com.pw999.jsmd.queue.QueueProperties;
 import com.pw999.jsmd.queue.WorkQueue;
@@ -34,7 +36,7 @@ import com.pw999.jsmd.scan.FileHasher;
 class ExtractionSchedulerIT {
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("pgvector/pgvector:pg17");
 
     @org.junit.jupiter.api.io.TempDir
     Path tmp;
@@ -68,7 +70,15 @@ class ExtractionSchedulerIT {
         PdfTextReader textReader = new PdfTextReader();
         PdfExtractor pdfExtractor = new PdfExtractor(textReader, ocrService);
         ImageExtractor imageExtractor = new ImageExtractor(ocrService);
-        ExtractionService extractionService = new ExtractionService(workQueue, repo, pdfExtractor, imageExtractor, new FileHasher());
+        EmbeddingService embeddingService = new EmbeddingService(
+                new EmbedProperties(false, "http://localhost:11434", "nomic-embed-text:v1.5", 768, Duration.ofMinutes(60)),
+                new org.springframework.beans.factory.ObjectProvider<dev.langchain4j.model.embedding.EmbeddingModel>() {
+                    @Override
+                    public dev.langchain4j.model.embedding.EmbeddingModel getObject() {
+                        throw new IllegalStateException("no embedding model in test");
+                    }
+                });
+        ExtractionService extractionService = new ExtractionService(workQueue, repo, embeddingService, pdfExtractor, imageExtractor, new FileHasher());
 
         scheduler = new ExtractionScheduler(props, extractionService);
     }
@@ -129,7 +139,15 @@ class ExtractionSchedulerIT {
                 false, Duration.ofSeconds(10), List.of("en"), null, library, 150);
         OcrService ocrService = new OcrService(disabledProps);
         PdfTextReader textReader = new PdfTextReader();
-        ExtractionService svc = new ExtractionService(workQueue, repo,
+        EmbeddingService disabledEmbedding = new EmbeddingService(
+                new EmbedProperties(false, "http://localhost:11434", "nomic-embed-text:v1.5", 768, Duration.ofMinutes(60)),
+                new org.springframework.beans.factory.ObjectProvider<dev.langchain4j.model.embedding.EmbeddingModel>() {
+                    @Override
+                    public dev.langchain4j.model.embedding.EmbeddingModel getObject() {
+                        throw new IllegalStateException("no embedding model in test");
+                    }
+                });
+        ExtractionService svc = new ExtractionService(workQueue, repo, disabledEmbedding,
                 new PdfExtractor(textReader, ocrService),
                 new ImageExtractor(ocrService),
                 new FileHasher());

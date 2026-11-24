@@ -20,7 +20,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 class FlywayMigrationIT {
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("pgvector/pgvector:pg17");
 
     private ConfigurableApplicationContext start() {
         return new SpringApplicationBuilder(JsmdApplication.class)
@@ -55,7 +55,7 @@ class FlywayMigrationIT {
             // first start applied the migrations
         }
         History first = history();
-        assertThat(first.rows()).isEqualTo(4);
+        assertThat(first.rows()).isEqualTo(5);
 
         try (ConfigurableApplicationContext ignored = start()) {
             // restart against an up-to-date database

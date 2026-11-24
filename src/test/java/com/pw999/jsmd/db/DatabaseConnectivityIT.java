@@ -23,7 +23,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 class DatabaseConnectivityIT {
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("pgvector/pgvector:pg17");
 
     private SpringApplicationBuilder app(String jdbcUrl, String user, String password) {
         return new SpringApplicationBuilder(JsmdApplication.class)

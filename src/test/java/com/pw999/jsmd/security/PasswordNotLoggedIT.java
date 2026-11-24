@@ -21,7 +21,7 @@ class PasswordNotLoggedIT {
     private static final String ADMIN_PASSWORD = "Zx9-unique-admin-pw-4471";
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("pgvector/pgvector:pg17");
 
     @Test
     void adminPasswordIsNotWrittenToStartupLogs(CapturedOutput output) {

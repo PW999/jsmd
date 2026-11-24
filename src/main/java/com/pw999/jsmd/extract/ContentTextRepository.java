@@ -1,5 +1,6 @@
 package com.pw999.jsmd.extract;
 
+import com.pgvector.PGvector;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -22,28 +23,31 @@ public class ContentTextRepository {
     }
 
     /**
-     * Stores or replaces the extracted text for a content item.
+     * Stores or replaces the extracted text for a content item, together with its embedding.
      *
      * @param contentId  the content this text was extracted from
      * @param text       the extracted text (NUL characters are stripped automatically)
      * @param source     how the text was obtained
      * @param pageCount  number of pages (may be null for images)
+     * @param embedding  the embedding of the text, or null when embedding is disabled or not available
      */
-    public void upsert(long contentId, String text, ExtractionResult.Source source, Integer pageCount) {
+    public void upsert(long contentId, String text, ExtractionResult.Source source, Integer pageCount, float[] embedding) {
         String sanitised = text == null ? "" : text.replace("\u0000", "");
         jdbc.sql("""
-                        INSERT INTO content_text (content_id, text, source, page_count, extracted_at)
-                        VALUES (?, ?, ?, ?, now())
+                        INSERT INTO content_text (content_id, text, source, page_count, extracted_at, embedding)
+                        VALUES (?, ?, ?, ?, now(), ?)
                         ON CONFLICT (content_id) DO UPDATE
                             SET text = EXCLUDED.text,
                                 source = EXCLUDED.source,
                                 page_count = EXCLUDED.page_count,
-                                extracted_at = now()
+                                extracted_at = now(),
+                                embedding = EXCLUDED.embedding
                         """)
                 .param(contentId)
                 .param(sanitised)
                 .param(source.name())
                 .param(pageCount)
+                .param(embedding == null ? null : new PGvector(embedding))
                 .update();
     }
 

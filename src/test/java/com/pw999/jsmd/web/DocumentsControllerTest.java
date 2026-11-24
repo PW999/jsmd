@@ -19,6 +19,7 @@ import com.pw999.jsmd.document.DocumentDownload;
 import com.pw999.jsmd.document.DocumentDownloadService;
 import com.pw999.jsmd.document.DocumentNotFoundException;
 import com.pw999.jsmd.document.DocumentRepository;
+import com.pw999.jsmd.embed.EmbeddingService;
 import com.pw999.jsmd.queue.QueueMonitor;
 import com.pw999.jsmd.document.DocumentRow;
 import com.pw999.jsmd.document.ExtractionState;
@@ -53,6 +54,9 @@ class DocumentsControllerTest {
 
     @MockitoBean
     DocumentDownloadService downloads;
+
+    @MockitoBean
+    EmbeddingService embeddings;
 
     @MockitoBean
     QueueMonitor queueMonitor;
@@ -185,8 +189,8 @@ class DocumentsControllerTest {
         given(documents.search("red bike", 1, 50)).willReturn(List.of(result(1, "/a.pdf", "a ", "red bike")));
 
         mvc.perform(get("/documents").param("q", "red bike").param("page", "1"))
-                .andExpect(content().string(containsString("href=\"/documents?page=0&amp;q=red%20bike\"")))
-                .andExpect(content().string(containsString("href=\"/documents?page=2&amp;q=red%20bike\"")))
+                .andExpect(content().string(containsString("href=\"/documents?page=0&amp;q=red%20bike&amp;mode=fts\"")))
+                .andExpect(content().string(containsString("href=\"/documents?page=2&amp;q=red%20bike&amp;mode=fts\"")))
                 .andExpect(content().string(containsString("Page 2")));
     }
 
@@ -196,7 +200,7 @@ class DocumentsControllerTest {
         given(documents.search(anyString(), anyInt(), anyInt())).willReturn(List.of(result(1, "/a.pdf", "", "x")));
 
         mvc.perform(get("/documents").param("q", "x").param("page", "99"))
-                .andExpect(content().string(containsString("href=\"/documents?page=1&amp;q=x\"")))
+                .andExpect(content().string(containsString("href=\"/documents?page=1&amp;q=x&amp;mode=fts\"")))
                 .andExpect(content().string(not(containsString("Next"))));
         verify(documents).search("x", 2, 50);
         mvc.perform(get("/documents").param("q", "x").param("page", "-4"))

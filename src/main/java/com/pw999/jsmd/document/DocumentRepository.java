@@ -1,5 +1,6 @@
 package com.pw999.jsmd.document;
 
+import com.pgvector.PGvector;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -112,5 +113,41 @@ public class DocumentRepository {
                         rs.getObject("page_count", Integer.class),
                         rs.getBytes("sha256")))
                 .optional();
+    }
+
+    /**
+     * Returns one page of files whose stored embedding is closest to the query vector, best match first.
+     * Files without a stored embedding are excluded; vector mode never produces a snippet.
+     */
+    public List<SearchResult> searchVector(float[] queryVector, int page, int size) {
+        return jdbc.sql("""
+                        SELECT fl.id, fl.path, fl.size
+                        FROM file_location fl
+                        JOIN content_text ct ON ct.content_id = fl.content_id
+                        WHERE ct.embedding IS NOT NULL
+                        ORDER BY ct.embedding <=> ?, fl.path, fl.id
+                        LIMIT ? OFFSET ?
+                        """)
+                .param(new PGvector(queryVector))
+                .param(size)
+                .param((long) page * size)
+                .query((rs, n) -> new SearchResult(
+                        rs.getLong("id"),
+                        rs.getString("path"),
+                        rs.getLong("size"),
+                        new Snippet(List.of())))
+                .list();
+    }
+
+    /** Returns the number of content rows that have a stored embedding, for vector search. */
+    public long countVectorMatches() {
+        return jdbc.sql("""
+                        SELECT count(*)
+                        FROM file_location fl
+                        JOIN content_text ct ON ct.content_id = fl.content_id
+                        WHERE ct.embedding IS NOT NULL
+                        """)
+                .query(Long.class)
+                .single();
     }
 }

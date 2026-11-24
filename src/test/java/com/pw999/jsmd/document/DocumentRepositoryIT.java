@@ -1,5 +1,6 @@
 package com.pw999.jsmd.document;
 
+import com.pgvector.PGvector;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
@@ -7,7 +8,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -16,7 +17,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 class DocumentRepositoryIT {
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("pgvector/pgvector:pg17");
 
     JdbcClient jdbc;
     DocumentRepository repo;
@@ -32,8 +33,9 @@ class DocumentRepositoryIT {
                 .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
                 .load()
                 .migrate();
-        jdbc = JdbcClient.create(new DriverManagerDataSource(
-                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
+        jdbc = JdbcClient.create(new SingleConnectionDataSource(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword(), true));
+        jdbc.sql("SET ivfflat.probes = 100").update();
         repo = new DocumentRepository(jdbc);
     }
 
@@ -58,6 +60,33 @@ class DocumentRepositoryIT {
     private void insertText(long contentId, String text, String source, Integer pages) {
         jdbc.sql("INSERT INTO content_text (content_id, text, source, page_count) VALUES (?, ?, ?, ?)")
                 .param(contentId).param(text).param(source).param(pages).update();
+    }
+
+    private void insertEmbeddedText(long contentId, String text, int markerIndex, float value) {
+        float[] vector = new float[768];
+        if (markerIndex >= 0 && markerIndex < 768) {
+            vector[markerIndex] = value;
+        }
+        jdbc.sql("INSERT INTO content_text (content_id, text, source, page_count, embedding) VALUES (?, ?, 'TEXT_LAYER', 1, ?)")
+                .param(contentId).param(text).param(new PGvector(vector)).update();
+    }
+
+    private void insertVec(long contentId, float[] vector) {
+        jdbc.sql("INSERT INTO content_text (content_id, text, source, page_count, embedding) VALUES (?, ?, 'TEXT_LAYER', 1, ?)")
+                .param(contentId).param("some text").param(new PGvector(vector)).update();
+    }
+
+    private float[] unit(int markerIndex, float value) {
+        float[] vector = new float[768];
+        vector[markerIndex] = value;
+        return vector;
+    }
+
+    private float[] near(int from, float fromValue, int to, float toValue) {
+        float[] vector = new float[768];
+        vector[from] = fromValue;
+        vector[to] = toValue;
+        return vector;
     }
 
     @Test
@@ -181,9 +210,30 @@ class DocumentRepositoryIT {
         indexed("/catfish.pdf", 3, "a cat and a fish");
         indexed("/none.pdf", 4, "a bird");
 
-        assertThat(searchPaths("cat or dog")).containsExactly("/cat.pdf", "/catfish.pdf", "/dog.pdf");
+        assertThat(searchPaths("cat or dog")).containsExactly("/catfish.pdf", "/cat.pdf", "/dog.pdf");
         assertThat(searchPaths("cat -fish")).containsExactly("/cat.pdf");
         assertThat(repo.countMatches("cat -fish")).isEqualTo(1);
+    }
+
+    @Test
+    void searchVectorReturnsResultsOrderedByCosineSimilarity() {
+        long c1 = insertContent(1);
+        insertVec(c1, unit(0, 1.0f));
+        insertLocation("/exact.pdf", c1);
+
+        long c2 = insertContent(2);
+        insertVec(c2, unit(1, 1.0f));
+        insertLocation("/orthogonal.pdf", c2);
+
+        long c3 = insertContent(3);
+        insertVec(c3, near(0, 1.0f, 1, 0.1f));
+        insertLocation("/close.pdf", c3);
+
+        float[] query = new float[768];
+        query[0] = 1.0f;
+
+        assertThat(searchVectorPaths(query))
+                .containsExactly("/exact.pdf", "/close.pdf", "/orthogonal.pdf");
     }
 
     @Test
@@ -265,5 +315,61 @@ class DocumentRepositoryIT {
     @Test
     void findIsEmptyForUnknownId() {
         assertThat(repo.find(-1L)).isEmpty();
+    }
+
+    private List<String> searchVectorPaths(float[] queryVector) {
+        return repo.searchVector(queryVector, 0, 50).stream().map(SearchResult::path).toList();
+    }
+
+    @Test
+    void searchVectorExcludesFilesWithoutEmbedding() {
+        long c1 = insertContent(1);
+        insertEmbeddedText(c1, "has embedding", 0, 1.0f);
+        insertLocation("/with.pdf", c1);
+
+        long c2 = insertContent(2);
+        insertText(c2, "no embedding", "TEXT_LAYER", 1);
+        insertLocation("/without.pdf", c2);
+
+        long c3 = insertContent(3);
+        insertLocation("/pending.pdf", c3);
+
+        assertThat(repo.countVectorMatches()).isEqualTo(1);
+
+        float[] query = new float[768];
+        query[0] = 1.0f;
+        assertThat(searchVectorPaths(query)).containsExactly("/with.pdf");
+    }
+
+    @Test
+    void searchVectorPagesResults() {
+        for (int i = 0; i < 5; i++) {
+            long c = insertContent(i + 10);
+            insertEmbeddedText(c, "similar text", 0, 1.0f);
+            insertLocation("/vec" + i + ".pdf", c);
+        }
+
+        float[] query = new float[768];
+        query[0] = 1.0f;
+        assertThat(repo.countVectorMatches()).isEqualTo(5);
+        assertThat(repo.searchVector(query, 0, 2)).extracting(SearchResult::path).containsExactly("/vec0.pdf", "/vec1.pdf");
+        assertThat(repo.searchVector(query, 1, 2)).extracting(SearchResult::path).containsExactly("/vec2.pdf", "/vec3.pdf");
+        assertThat(repo.searchVector(query, 2, 2)).extracting(SearchResult::path).containsExactly("/vec4.pdf");
+        assertThat(repo.searchVector(query, 3, 2)).isEmpty();
+    }
+
+    @Test
+    void searchVectorTiesAreOrderedByPath() {
+        long c1 = insertContent(1);
+        insertEmbeddedText(c1, "same", 0, 1.0f);
+        insertLocation("/b.pdf", c1);
+
+        long c2 = insertContent(2);
+        insertEmbeddedText(c2, "same", 0, 1.0f);
+        insertLocation("/a.pdf", c2);
+
+        float[] query = new float[768];
+        query[0] = 1.0f;
+        assertThat(searchVectorPaths(query)).containsExactly("/a.pdf", "/b.pdf");
     }
 }

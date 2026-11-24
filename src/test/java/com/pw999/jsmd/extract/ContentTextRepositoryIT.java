@@ -15,7 +15,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 class ContentTextRepositoryIT {
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("pgvector/pgvector:pg17");
 
     JdbcClient jdbc;
     ContentTextRepository repo;
@@ -67,27 +67,49 @@ class ContentTextRepositoryIT {
     @Test
     void upsertStoresText() {
         long cid = insertContent((byte) 1);
-        repo.upsert(cid, "hello world", ExtractionResult.Source.TEXT_LAYER, 1);
+        repo.upsert(cid, "hello world", ExtractionResult.Source.TEXT_LAYER, 1, null);
 
         assertThat(storedText(cid)).isEqualTo("hello world");
         assertThat(storedSource(cid)).isEqualTo("TEXT_LAYER");
     }
 
     @Test
+    void upsertStoresTextAndEmbedding() {
+        long cid = insertContent((byte) 1);
+        float[] embedding = new float[768];
+        embedding[0] = 1.5f;
+        embedding[1] = -0.3f;
+        repo.upsert(cid, "test text", ExtractionResult.Source.TEXT_LAYER, 1, embedding);
+
+        assertThat(storedText(cid)).isEqualTo("test text");
+        assertThat(storedSource(cid)).isEqualTo("TEXT_LAYER");
+        assertThat(jdbc.sql("SELECT vector_dims(embedding) FROM content_text WHERE content_id = ?")
+                .param(cid).query(Integer.class).single()).isEqualTo(768);
+        assertThat(jdbc.sql("SELECT embedding::text FROM content_text WHERE content_id = ?")
+                .param(cid).query(String.class).single()).contains("[1.5,-0.3");
+    }
+
+    @Test
     void reprocessingReplacesExistingRow() {
         long cid = insertContent((byte) 2);
-        repo.upsert(cid, "first", ExtractionResult.Source.TEXT_LAYER, 1);
-        repo.upsert(cid, "second", ExtractionResult.Source.OCR, 2);
+        repo.upsert(cid, "first", ExtractionResult.Source.TEXT_LAYER, 1, null);
+        float[] embedding = new float[768];
+        embedding[0] = 0f;
+        repo.upsert(cid, "second", ExtractionResult.Source.OCR, 2, embedding);
 
         assertThat(rowCount(cid)).isEqualTo(1);
         assertThat(storedText(cid)).isEqualTo("second");
         assertThat(storedSource(cid)).isEqualTo("OCR");
+        assertThat(jdbc.sql("SELECT vector_dims(embedding) FROM content_text WHERE content_id = ?")
+                .param(cid).query(Integer.class).single()).isEqualTo(768);
+        assertThat(jdbc.sql("SELECT embedding::text FROM content_text WHERE content_id = ?")
+                .param(cid).query(String.class).single()).contains("[0,");
     }
 
     @Test
     void nulCharactersAreStripped() {
         long cid = insertContent((byte) 3);
-        repo.upsert(cid, "hello\u0000world", ExtractionResult.Source.OCR, null);
+        repo.upsert(cid, "hello\u0000world", ExtractionResult.Source.OCR, null, null);
 
         assertThat(storedText(cid)).isEqualTo("helloworld");
     }
@@ -103,10 +125,10 @@ class ContentTextRepositoryIT {
     @Test
     void replacedTextMatchesNewWordsAndNotOldWords() {
         long cid = insertContent((byte) 5);
-        repo.upsert(cid, "apple banana", ExtractionResult.Source.TEXT_LAYER, 1);
+        repo.upsert(cid, "apple banana", ExtractionResult.Source.TEXT_LAYER, 1, null);
         assertThat(matches("apple")).isEqualTo(1);
 
-        repo.upsert(cid, "cherry", ExtractionResult.Source.OCR, 1);
+        repo.upsert(cid, "cherry", ExtractionResult.Source.OCR, 1, null);
 
         assertThat(matches("cherry")).isEqualTo(1);
         assertThat(matches("apple")).isZero();
@@ -123,7 +145,7 @@ class ContentTextRepositoryIT {
         }
         String text = sb.append("tailword").toString();
 
-        repo.upsert(cid, text, ExtractionResult.Source.TEXT_LAYER, 1);
+        repo.upsert(cid, text, ExtractionResult.Source.TEXT_LAYER, 1, null);
 
         assertThat(storedText(cid)).hasSize(text.length());
         assertThat(matches("needle")).isEqualTo(1);

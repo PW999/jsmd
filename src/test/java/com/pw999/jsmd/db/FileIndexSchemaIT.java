@@ -18,7 +18,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 class FileIndexSchemaIT {
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("pgvector/pgvector:pg17");
 
     private Connection migrate() throws SQLException {
         Flyway.configure()
